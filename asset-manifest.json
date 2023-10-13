@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/whymon/static/css/main.57cc7ab0.css",
+    "main.js": "/whymon/static/js/main.40bc27b7.js",
+    "static/js/787.f0c62487.chunk.js": "/whymon/static/js/787.f0c62487.chunk.js",
+    "index.html": "/whymon/index.html",
+    "main.57cc7ab0.css.map": "/whymon/static/css/main.57cc7ab0.css.map",
+    "main.40bc27b7.js.map": "/whymon/static/js/main.40bc27b7.js.map",
+    "787.f0c62487.chunk.js.map": "/whymon/static/js/787.f0c62487.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.57cc7ab0.css",
+    "static/js/main.40bc27b7.js"
+  ]
+}
