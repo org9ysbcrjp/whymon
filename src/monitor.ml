@@ -70,7 +70,7 @@ let split_in_out get_ts (l, r) deque =
                        if ts <= r then
                          (if ts >= l then
                             split_in_out_rec d' (Fdeque.enqueue_back nd el')
-                          else (Fdeque.enqueue_front d el', nd))
+                          else split_in_out_rec d' nd)
                        else (d, nd) in
   split_in_out_rec deque new_in
 
@@ -84,7 +84,7 @@ let split_out_in get_ts (z, l) deque =
                        if ts < l then
                          (if ts >= z then
                             split_out_in_rec d' (Fdeque.enqueue_back nd el')
-                          else (nd, Fdeque.enqueue_front d el'))
+                          else split_out_in_rec d' nd)
                        else (nd, d) in
   split_out_in_rec deque new_out
 
@@ -220,7 +220,7 @@ module Once = struct
                 ; v_alphas_in = Fdeque.empty
                 ; v_alphas_out = Fdeque.empty }
 
-  let moaux_to_string { ts_zero
+  let to_string { ts_zero
                       ; tstps_in
                       ; tstps_out
                       ; s_alphas_in
@@ -713,7 +713,7 @@ module Since = struct
   let update_v_alpha_betas_in tp new_in v_alpha_betas_in =
     let v_alpha_betas_in_vapp = Fdeque.fold new_in ~init:v_alpha_betas_in ~f:(fun v_alpha_betas_in' (_, _, vp2_opt) ->
                                     match vp2_opt with
-                                    | None -> v_alpha_betas_in'
+                                    | None -> Fdeque.empty
                                     | Some(vp2) -> v_append_deque vp2 v_alpha_betas_in') in
     let v_alpha_betas_in' = add_new_ps_v_alpha_betas_in tp new_in v_alpha_betas_in_vapp in
     update_v_alpha_betas_in_tps tp v_alpha_betas_in'
@@ -761,13 +761,14 @@ module Since = struct
     let (s_beta_alphas_out, s_beta_alphas_in) = shift_sat (l,r) msaux.s_beta_alphas_out msaux.s_beta_alphas_in in
     let (v_alphas_betas_out, v_alpha_betas_in, v_betas_in) =
       shift_vio (l, r) tp msaux.v_alphas_betas_out msaux.v_alpha_betas_in msaux.v_betas_in in
-    { (clean (l, r) msaux) with tstps_in
-                              ; tstps_out
-                              ; s_beta_alphas_in
-                              ; s_beta_alphas_out
-                              ; v_alpha_betas_in
-                              ; v_betas_in
-                              ; v_alphas_betas_out }
+    clean (l, r) ({ msaux with
+                    tstps_in
+                  ; tstps_out
+                  ; s_beta_alphas_in
+                  ; s_beta_alphas_out
+                  ; v_alpha_betas_in
+                  ; v_betas_in
+                  ; v_alphas_betas_out })
 
   let eval tp msaux =
     if not (Fdeque.is_empty msaux.s_beta_alphas_in) then
@@ -1025,28 +1026,10 @@ module Until = struct
     let v_betas_alpha_step1 = Fdeque.map v_betas_alpha ~f:(fun d ->
                                   remove_cond_front (fun (ts', p) ->
                                       (ts' < first_ts + a) || ((Proof.p_at p) < first_tp)) d) in
-    (* Stdio.printf "%s" *)
-    (*   (Fdeque.fold v_betas_alpha_step1 ~init:"\nv_betas_alpha_step1 = \n" *)
-    (*      ~f:(fun acc1 d -> *)
-    (*        acc1 ^ "\n" ^ *)
-    (*          Fdeque.fold d ~init:"[" ~f:(fun acc2 (ts, p) -> *)
-    (*              acc2 ^ (Printf.sprintf "\n(%d)\n" ts) ^ Proof.to_string "" p) ^ "\n]\n")); *)
     let v_betas_alpha_step2 = if a = 0 then
                                 drop_v_single_ts eval_tp v_betas_alpha_step1
                               else drop_v_ts a first_ts v_betas_alpha_step1 tstps_in' in
-    (* Stdio.printf "%s" *)
-    (*   (Fdeque.fold v_betas_alpha_step2 ~init:"\nv_betas_alpha_step2 = \n" *)
-    (*      ~f:(fun acc1 d -> *)
-    (*        acc1 ^ "\n" ^ *)
-    (*          Fdeque.fold d ~init:"[" ~f:(fun acc2 (ts, p) -> *)
-    (*              acc2 ^ (Printf.sprintf "\n(%d)\n" ts) ^ Proof.to_string "" p) ^ "\n]\n")); *)
     let v_betas_alpha_step3 = remove_cond_front_ne (fun d' -> Fdeque.is_empty d') v_betas_alpha_step2 in
-    (* Stdio.printf "%s" *)
-    (*   (Fdeque.fold v_betas_alpha_step3 ~init:"\nv_betas_alpha_step3 = \n" *)
-    (*      ~f:(fun acc1 d -> *)
-    (*        acc1 ^ "\n" ^ *)
-    (*          Fdeque.fold d ~init:"[" ~f:(fun acc2 (ts, p) -> *)
-    (*              acc2 ^ (Printf.sprintf "\n(%d)\n" ts) ^ Proof.to_string "" p) ^ "\n]\n")); *)
     (* tstp_out and tstp_in *)
     let (tstps_out'', tstps_in'') = shift_tstps_future a first_ts ntp tstps_out' tstps_in' in
     (* s_alphas_beta *)
@@ -1466,7 +1449,7 @@ let rec meval vars ts tp (db: Db.t) = function
          (fun expl ts tp (aux_pdt, es) ->
            let (aux_pdt', es') =
              Pdt.split_prod (Pdt.apply2 vars (fun p aux -> Once.update i ts tp p aux) expl aux_pdt) in
-           (aux_pdt', Pdt.split_list es'))
+           (aux_pdt', es @ (Pdt.split_list es')))
          (moaux_pdt, []) (expls, (tstps @ [(ts,tp)])) in
      let expls'' = List.map expls' ~f:(Pdt.reduce Proof.equal) in
      (expls'', MOnce (i, mf', tstps', moaux_pdt'))
@@ -1491,7 +1474,7 @@ let rec meval vars ts tp (db: Db.t) = function
          (fun expl ts tp (aux_pdt, es) ->
            let (aux_pdt', es') =
              Pdt.split_prod (Pdt.apply2 vars (fun p aux -> Historically.update i ts tp p aux) expl aux_pdt) in
-           (aux_pdt', Pdt.split_list es'))
+           (aux_pdt', es @ (Pdt.split_list es')))
          (mhaux_pdt, []) (expls, (tstps @ [(ts,tp)])) in
      let expls'' = List.map expls' ~f:(Pdt.reduce Proof.equal) in
      (expls'', MHistorically (i, mf', tstps', mhaux_pdt'))
@@ -1517,7 +1500,7 @@ let rec meval vars ts tp (db: Db.t) = function
          (fun expl1 expl2 ts tp (aux_pdt, es) ->
            let (aux_pdt', es') =
              Pdt.split_prod (Pdt.apply3 vars (fun p1 p2 aux -> Since.update i ts tp p1 p2 aux) expl1 expl2 aux_pdt) in
-           (aux_pdt', Pdt.split_list es'))
+           (aux_pdt', es @ (Pdt.split_list es')))
          (msaux_pdt, []) (Buf2.add expls1 expls2 buf2) (tstps @ [(ts,tp)]) in
      let expls'' = List.map expls' ~f:(Pdt.reduce Proof.equal) in
      (expls'', MSince (i, mf1', mf2', (buf2', tstps'), msaux_pdt'))
